@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+
+# Editable install artefacts
+pip-wheel-metadata/
+
+# Vendored Textual reference clone — pulled separately, never tracked here
+textual/
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Smoke-harness scratch keys
+_keys*/
+
+# Smoke-pair POSIX log files (tui_smoke_pair.py logs each subprocess
+# to smoke/_pair_<name>.log on Linux/macOS — scratch output, not
+# tracked).
+smoke/_pair_*.log
