@@ -130,6 +130,7 @@ class MyPlugin(Plugin):
                     "title": "Send Command",
                     "type": "input",
                     "action": "run_command",
+                    "placeholder": "e.g. restart now",  # optional, defaults to "Enter value..."
                 },
                 {
                     "title": "Toggles",
@@ -148,8 +149,10 @@ class MyPlugin(Plugin):
 |---|---|
 | `info` | Key-value display rows |
 | `actions` | Buttons that fire plugin endpoints |
-| `input` | Text input + submit button that fires an endpoint with the typed value |
+| `input` | Text input + submit button that fires an endpoint with the typed value. Optional `placeholder` overrides the default "Enter value..." hint text. |
 | `toggle_list` | On/off switches that fire endpoints with the new state |
+
+An unknown section `type` renders an inline `Unknown section type: …` hint in the panel — useful for catching typos like `togglelist` vs `toggle_list` at development time.
 
 Each `action` string is a plugin endpoint `access_name`. The Dashboard routes the call through Plexus — effectively `tui_plugin.execute(your_plugin_name, action, args, hosts="any")` — not a direct method call on your plugin object. Inputs from the `input` section come through as `{"input": typed_value}`; toggles come through as `{"state": new_bool}`.
 

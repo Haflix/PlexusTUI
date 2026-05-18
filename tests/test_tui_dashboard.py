@@ -4294,7 +4294,7 @@ async def test_phase3a_plugin_table_columns(mock_pc):
         # with a `label` attribute.
         labels = [str(c.label) for c in table.columns.values()]
         assert labels == [
-            "Name", "Phase", "Ver", "R", "Eps", "Subs", "Evs", "Description",
+            "Name", "Phase", "Ver", "R/L", "Eps", "Subs", "Evs", "Description",
         ]
 
 

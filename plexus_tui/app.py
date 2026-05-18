@@ -161,6 +161,7 @@ Footer {
 
 #request-table { height: auto; max-height: 14; border: round #404040; background: #2d2d2d; }
 #request-empty { height: auto; padding: 0 1; }
+#plugin-empty { height: auto; padding: 0 1; }
 
 .section-header {
     color: #c7a06e;
@@ -1151,6 +1152,10 @@ class DashboardApp(App):
                 with VerticalScroll(id="plugins-scroll"):
                     yield Input(placeholder="Search plugins...", id="plugin-search")
                     yield DataTable(id="plugin-table", cursor_type="row")
+                    yield Static(
+                        "[dim]No plugins loaded[/dim]",
+                        id="plugin-empty", markup=True,
+                    )
                     with Horizontal(id="plugin-actions"):
                         yield Button("Enable", id="btn-enable", variant="success")
                         yield Button("Disable", id="btn-disable", variant="warning")
@@ -1488,6 +1493,9 @@ class DashboardApp(App):
                         with Horizontal(classes="setting-row"):
                             yield Static("Request poll (s):", classes="setting-label")
                             yield Input(str(DEFAULT_REQUEST_INTERVAL), id="setting-request-interval", type="number")
+                        with Horizontal(classes="setting-row"):
+                            yield Static("Network refresh (s):", classes="setting-label")
+                            yield Input(str(DEFAULT_NETWORK_INTERVAL), id="setting-network-interval", type="number")
                         yield Button("Apply", id="btn-apply-settings", variant="primary")
                         yield Static("", id="settings-status", markup=True)
 
@@ -1613,7 +1621,7 @@ class DashboardApp(App):
             # `_plugin_phase` from `pc.plugin_states[name].state` plus the
             # plugin instance's `_lifecycle_ready` and `ready` events.
             t.add_columns(
-                "Name", "Phase", "Ver", "R", "Eps", "Subs", "Evs",
+                "Name", "Phase", "Ver", "R/L", "Eps", "Subs", "Evs",
                 "Description",
             )
         except NoMatches:
@@ -2233,6 +2241,14 @@ class DashboardApp(App):
                     if name not in states_snapshot:
                         states_snapshot[name] = None
         except Exception:
+            pass
+
+        # Symmetric with the Active-Requests "No active requests" placeholder
+        # (#request-empty above). Show the empty-state hint when no plugin
+        # rows survived the merge with `pc.plugins`.
+        try:
+            self.query_one("#plugin-empty").display = not states_snapshot
+        except NoMatches:
             pass
 
         filt = self._plugin_filter.lower()
@@ -5496,7 +5512,12 @@ class DashboardApp(App):
                 res_id = self._make_id("menu-res", plugin_name, ep, "menu-input-result")
                 self._id_registry[btn_id]["input_id"] = inp_id
                 self._id_registry[btn_id]["result_id"] = res_id
-                widgets.append(Input(placeholder="Enter value...", id=inp_id))
+                # `or` not `get(..., default)` so an explicit `null` /
+                # empty string in the YAML menu dict also falls back to
+                # the default — otherwise `placeholder: null` would
+                # render the literal string "None" in the Input.
+                placeholder = section.get("placeholder") or "Enter value..."
+                widgets.append(Input(placeholder=str(placeholder), id=inp_id))
                 widgets.append(Button("Send", id=btn_id, variant="primary"))
                 widgets.append(Static("", id=res_id))
             elif section_type == "info":
@@ -5505,6 +5526,14 @@ class DashboardApp(App):
                         widgets.append(Static(escape(item)))
                     elif isinstance(item, dict):
                         widgets.append(Static(f"  {escape(str(item.get('label', '')))}: {escape(str(item.get('value', '')))}"))
+            else:
+                # Unknown section type — flag it in-panel so a plugin
+                # author misspelling "toggle_list" gets an immediate
+                # visible hint instead of an empty section.
+                widgets.append(Static(
+                    f"[dim]Unknown section type: {escape(str(section_type))}[/dim]",
+                    markup=True,
+                ))
         return widgets
 
     # ─── Dynamic plugin tabs ─────────────────────────────────────────
@@ -5782,9 +5811,11 @@ class DashboardApp(App):
             si = float(self.query_one("#setting-stats-interval", Input).value)
             pi = float(self.query_one("#setting-plugin-interval", Input).value)
             ri = float(self.query_one("#setting-request-interval", Input).value)
+            ni = float(self.query_one("#setting-network-interval", Input).value)
             self._stats_interval = max(0.5, si)
             self._plugin_interval = max(1.0, pi)
             self._request_interval = max(0.5, ri)
+            self._network_interval = max(0.5, ni)
             self._start_timers()
             self._set_settings_status("Settings applied")
         except Exception as e:
@@ -7867,6 +7898,13 @@ class DashboardApp(App):
             self._refresh_plugin_table_worker()
             self._refresh_requests_worker()
             self._build_config_file_list()
+            # Phase 5 — `r` now also covers the Networking + Events
+            # tabs. Both have their own polling timers but the manual
+            # refresh hotkey should still hit them so a user pressing
+            # `r` on those tabs gets the same "force-refresh now"
+            # behaviour the other tabs have.
+            self._refresh_peers_table_worker()
+            self._refresh_subs_browser_worker()
         except Exception:
             pass
 
