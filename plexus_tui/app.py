@@ -984,8 +984,19 @@ class DashboardApp(App):
         `_main_loop` None; without the explicit None guard, the
         `.is_closed()` call would raise AttributeError and the
         outer try/except in callers would mask a silent no-op.
+
+        The `is_running()` check covers the stopped-but-not-yet-closed
+        window during Plexus shutdown: `run_coroutine_threadsafe`
+        accepts a stopped loop and schedules the coro via
+        `call_soon_threadsafe`, but the loop never drains the
+        callback queue, so the future never completes and the caller
+        would block on the 30s timeout. Bail out early instead.
         """
-        if self._main_loop is None or self._main_loop.is_closed():
+        if (
+            self._main_loop is None
+            or self._main_loop.is_closed()
+            or not self._main_loop.is_running()
+        ):
             coro.close()  # prevent "coroutine never awaited" warning
             return None
         future = asyncio.run_coroutine_threadsafe(coro, self._main_loop)

@@ -101,7 +101,7 @@ def spawn_node(
     peer_cert_pem_file: str,
     peer_hostname: str,
     ready_file: str,
-) -> subprocess.Popen:
+) -> tuple[subprocess.Popen, "object | None"]:
     """Spawn one node-runner subprocess in its own console window.
 
     Windows: CREATE_NEW_CONSOLE gives the subprocess a fresh console
@@ -112,6 +112,10 @@ def spawn_node(
     POSIX: redirect to a log file (terminal-spawning is fragile
     across distros — gnome-terminal vs xterm vs iTerm). Operator can
     `tail -f` the log for debugging.
+
+    Returns (Popen, log_file). The log_file is None on Windows;
+    on POSIX the caller must close it after the process has exited
+    so the trailing buffered output is flushed and the FD is freed.
     """
     cmd = [
         sys.executable,
@@ -126,15 +130,16 @@ def spawn_node(
         "--peer-ip", "127.0.0.1",
     ]
     if platform.system() == "Windows":
-        return subprocess.Popen(
+        proc = subprocess.Popen(
             cmd,
             cwd=str(REPO),
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
+        return proc, None
     log_path = _HERE / f"_pair_{label}.log"
     print(f"[pair] {label} log: {log_path}")
     log_file = open(log_path, "w", buffering=1, encoding="utf-8")
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         cmd,
         cwd=str(REPO),
         stdin=subprocess.DEVNULL,
@@ -142,6 +147,7 @@ def spawn_node(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    return proc, log_file
 
 
 def wait_for_ready(label: str, ready_file: str, timeout: float = 30.0) -> dict:
@@ -160,8 +166,16 @@ def wait_for_ready(label: str, ready_file: str, timeout: float = 30.0) -> dict:
     )
 
 
-def terminate_node(label: str, proc: subprocess.Popen | None) -> None:
-    if proc is None or proc.poll() is not None:
+def terminate_node(
+    label: str,
+    proc: subprocess.Popen | None,
+    log_file: "object | None" = None,
+) -> None:
+    if proc is None:
+        _close_log(log_file)
+        return
+    if proc.poll() is not None:
+        _close_log(log_file)
         return
     print(f"[pair] Terminating {label}...")
     try:
@@ -173,6 +187,16 @@ def terminate_node(label: str, proc: subprocess.Popen | None) -> None:
             proc.wait(timeout=2)
         except Exception:
             pass
+    except Exception:
+        pass
+    _close_log(log_file)
+
+
+def _close_log(log_file) -> None:
+    if log_file is None:
+        return
+    try:
+        log_file.close()
     except Exception:
         pass
 
@@ -190,11 +214,13 @@ def main() -> int:
 
     a_proc: subprocess.Popen | None = None
     b_proc: subprocess.Popen | None = None
+    a_log = None
+    b_log = None
     try:
         print(f"[pair] Node A (publisher) fingerprint:  {mtls['a_fp']}")
         print(f"[pair] Node B (subscriber) fingerprint: {mtls['b_fp']}")
         print(f"[pair] Spawning Node A on port {NODE_A_PORT}...")
-        a_proc = spawn_node(
+        a_proc, a_log = spawn_node(
             "node_a",
             NODE_A_CONFIG,
             NODE_A_PORT,
@@ -205,7 +231,7 @@ def main() -> int:
             a_ready,
         )
         print(f"[pair] Spawning Node B on port {NODE_B_PORT}...")
-        b_proc = spawn_node(
+        b_proc, b_log = spawn_node(
             "node_b",
             NODE_B_CONFIG,
             NODE_B_PORT,
@@ -255,8 +281,8 @@ def main() -> int:
         return 0
 
     finally:
-        terminate_node("Node A", a_proc)
-        terminate_node("Node B", b_proc)
+        terminate_node("Node A", a_proc, a_log)
+        terminate_node("Node B", b_proc, b_log)
         for f in (a_ready, b_ready):
             try:
                 Path(f).unlink(missing_ok=True)
