@@ -8,10 +8,18 @@ endpoints:
     internal_name: tick
     remote: false
     accessible_by_other_plugins: true
-    description: Bump the counter and append (timestamp, source) to the tick log. Called from the widget's timer and button.
+    description: Bump the counter and append (timestamp, source) to the tick log. Called from the widget's timer and button via the Dashboard's _run_on_main cross-loop dispatcher.
     tags: ["demo"]
     arguments:
       - {name: source, type: str, description: Who triggered the tick (auto / manual), default: "manual"}
+
+  get_state:
+    internal_name: get_state
+    remote: false
+    accessible_by_other_plugins: true
+    description: Returns a {count, log} snapshot under the plugin's threading lock. Used by the widget's 0.5s refresh; the lock keeps reads consistent against concurrent tick() mutations.
+    tags: ["demo"]
+    arguments: []
 
   reset:
     internal_name: reset

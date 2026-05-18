@@ -94,7 +94,7 @@ class MyPluginWidget(Vertical):
 2. Dashboard registers `tui/` as package `_tui_{PluginName}` in `sys.modules`.
 3. Dashboard executes `__init__.py` — internal relative imports resolve.
 4. Dashboard instantiates the widget with `WidgetClass(plugin_instance)`.
-5. The module is cleared from `sys.modules` when the tab closes; reopening the tab re-imports from disk. This means edits to your TUI module are picked up on the next reopen without restarting Plexus.
+5. The module is cleared from `sys.modules` when the tab closes; reopening the tab re-imports from disk. This means edits to your TUI module are picked up on the next reopen without restarting Plexus. (A plugin only has one open tab at a time today — the Dashboard's open-tab path skips if the tab id already exists — so this "cleanup on close + reimport on reopen" pairing is consistent in practice.)
 
 A working example ships at [`examples/WidgetDemo/`](../examples/WidgetDemo/) — `plugin.py` plus a `tui/` package with `__init__.py` / `css.py` / `main_widget.py`. Read it for the smallest end-to-end version.
 

@@ -1,21 +1,20 @@
 """WidgetDemo — full-Textual-widget tab demo.
 
-Demonstrates Option 1 from `docs/CUSTOM_TABS.md`: the plugin returns a
-`get_tui_module_info()` dict pointing at a sibling `tui/` directory.
-The Dashboard imports the package via importlib (registering it in
-`sys.modules` as `_tui_WidgetDemo` so internal relative imports
-resolve), then instantiates the named widget class.
+Plugin side of the Option 1 example from docs/CUSTOM_TABS.md. The
+widget lives in `tui/`; this file just declares the plugin and the
+endpoints the widget calls.
 
-Open this plugin's tab from the Dashboard's Plugins list. The widget
-shows a live-updating counter, a small per-tick log, and a button
-that calls back into this plugin's `tick` endpoint via the framework's
-execute mechanism.
-
-For the lighter declarative-menu alternative (Option 2), see
-`examples/TUIDemoSpare/`.
+The widget runs on the Dashboard's Textual loop (a separate thread
+from Plexus's main loop), so all cross-loop state is protected here
+by a single `threading.Lock`. The widget reads state via `get_state`
+and triggers mutations via `tick` — both routed through the
+Dashboard's `_run_on_main` so the coroutines execute on the right
+loop.
 """
 
 import os
+import threading
+from collections import deque
 from datetime import datetime
 
 from plexus.utils import Plugin
@@ -30,8 +29,16 @@ class WidgetDemo(Plugin):
             "Dashboard loads a full Textual widget from this plugin's "
             "tui/ directory."
         )
+        # All cross-loop state mutations + reads take this lock. The
+        # plugin runs its coroutines on the main Plexus loop; the
+        # widget calls get_state() / tick() from the Dashboard's
+        # Textual loop via _run_on_main. Both sides acquire the lock
+        # for the brief windows they touch _tick_count / _tick_log.
+        self._lock = threading.Lock()
         self._tick_count = 0
-        self._tick_log = []  # list[(timestamp, source)]
+        # Bounded deque — append + popleft are GIL-atomic, and the
+        # maxlen=20 cap is enforced by deque itself (no slice rebuild).
+        self._tick_log: "deque[tuple[str, str]]" = deque(maxlen=20)
 
     @async_log_errors
     async def on_enable(self):
@@ -41,42 +48,51 @@ class WidgetDemo(Plugin):
     async def on_disable(self):
         pass
 
-    # ── Endpoint the widget pokes ────────────────────────────────────
+    # ── Endpoints called by the widget ───────────────────────────────
 
     @async_log_errors
     async def tick(self, source: str = "manual"):
         """Bump the counter and log who triggered it.
 
-        Called from the widget's auto-tick timer (source="auto") and
-        from its button (source="manual"). The widget reads the
-        plugin's _tick_count + _tick_log fields directly via the
-        plugin reference it gets at construction time.
+        Called from the widget's auto-tick timer (`source="auto"`) and
+        its button (`source="manual"`). Runs on the main Plexus loop —
+        the widget dispatches via `self.app._run_on_main(...)`.
         """
-        self._tick_count += 1
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        self._tick_log.append((ts, source))
-        if len(self._tick_log) > 20:
-            self._tick_log = self._tick_log[-20:]
-        return {"count": self._tick_count, "log_len": len(self._tick_log)}
+        with self._lock:
+            self._tick_count += 1
+            self._tick_log.append((ts, source))
+            count = self._tick_count
+            log_len = len(self._tick_log)
+        return {"count": count, "log_len": log_len}
+
+    @async_log_errors
+    async def get_state(self):
+        """Return a snapshot of current state for the widget to render.
+
+        Routes through Plexus the same way `tick` does, so the read
+        happens on the main loop under the lock — no torn reads even
+        if the widget polls while a tick is in flight.
+        """
+        with self._lock:
+            return {
+                "count": self._tick_count,
+                "log": list(self._tick_log),
+            }
 
     @async_log_errors
     async def reset(self):
         """Zero the counter and clear the log."""
-        self._tick_count = 0
-        self._tick_log = []
+        with self._lock:
+            self._tick_count = 0
+            self._tick_log.clear()
         return {"ok": True}
 
     # ── Custom tab (Option 1: full Textual widget) ───────────────────
 
     def get_tui_module_info(self):
-        """Tell the Dashboard which TUI package + class to load.
-
-        The Dashboard registers the returned path as a proper Python
-        package in sys.modules (as `_tui_WidgetDemo`) before importing,
-        so the widget's own `from .css import ...` style relative
-        imports work even though Plexus loads this plugin without
-        __package__ set.
-        """
+        """Return path + class_name so the Dashboard can import the
+        widget package and instantiate the named class."""
         return {
             "path": os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),

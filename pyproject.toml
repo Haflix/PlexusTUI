@@ -50,4 +50,9 @@ Issues = "https://github.com/Haflix/PlexusTUI/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
+# The `examples/` directory (TUIDemoSpare, WidgetDemo) is repo-only —
+# users browse it on GitHub for reference but it isn't bundled into
+# the pip distribution. Each demo is a standalone plugin with its
+# own plugin.py + plugin_config.yml; users copy them into their own
+# host config to try them out.
 include = ["plexus_tui*"]
