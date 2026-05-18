@@ -18,8 +18,10 @@ Requires Python 3.11+.
 Install `plexus-core` first (from a sibling checkout of the framework repo), then install this plugin editable:
 
 ```bash
-# 1. Get the framework (the PyPI distribution name will be `plexus-core`)
-git clone https://github.com/Haflix/AIO_Assistant_Core.git
+# 1. Get the framework (the PyPI distribution name will be `plexus-core`).
+#    The `unstable` branch is the live development line and currently
+#    carries plexus-core 0.40.1 — `main` is reserved for tagged releases.
+git clone -b unstable https://github.com/Haflix/AIO_Assistant_Core.git
 pip install -e ./AIO_Assistant_Core
 
 # 2. Install this plugin

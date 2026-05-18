@@ -1826,6 +1826,12 @@ class DashboardApp(App):
             except Exception:
                 pass
         self._plugin_tab_map.clear()
+        # Symmetry with `_plugin_tab_map.clear()` above — `_plugin_tab_modes`
+        # is populated in lockstep with `_plugin_tab_map` (set in
+        # `_open_plugin_tab` / cleared in `_close_plugin_tab`), so dropping
+        # one without the other leaves the instance's state inconsistent
+        # for the remainder of `_shutdown`.
+        self._plugin_tab_modes.clear()
         # Phase 2b — explicitly unregister the app-side bus observers
         # registered in `on_mount`. Plexus's `_unobserve_plugin`
         # auto-cleans on plugin pop, but app exit (e.g. user presses
