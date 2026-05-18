@@ -64,24 +64,24 @@ from textual.widgets import (
 # ── Import siblings ──────────────────────────────────────────────────
 import sys as _sys
 
-if "tui_dashboard.log_handler" in _sys.modules:
-    TUILogHandler = _sys.modules["tui_dashboard.log_handler"].TUILogHandler
+if "plexus_tui.log_handler" in _sys.modules:
+    TUILogHandler = _sys.modules["plexus_tui.log_handler"].TUILogHandler
 else:
     import importlib.util as _ilu
     _spec = _ilu.spec_from_file_location(
-        "tui_dashboard.log_handler",
+        "plexus_tui.log_handler",
         os.path.join(os.path.dirname(__file__), "log_handler.py"),
     )
     _mod = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(_mod)
     TUILogHandler = _mod.TUILogHandler
 
-if "tui_dashboard.request_tracker" in _sys.modules:
-    RequestTracker = _sys.modules["tui_dashboard.request_tracker"].RequestTracker
+if "plexus_tui.request_tracker" in _sys.modules:
+    RequestTracker = _sys.modules["plexus_tui.request_tracker"].RequestTracker
 else:
     import importlib.util as _ilu2
     _spec2 = _ilu2.spec_from_file_location(
-        "tui_dashboard.request_tracker",
+        "plexus_tui.request_tracker",
         os.path.join(os.path.dirname(__file__), "request_tracker.py"),
     )
     _mod2 = _ilu2.module_from_spec(_spec2)
@@ -1800,6 +1800,21 @@ class DashboardApp(App):
 
     async def _shutdown(self) -> None:
         self.log_handler.detach()
+        # Clean up any plugin TUI modules still cached in sys.modules.
+        # close_plugin_tab does this when the user explicitly closes a
+        # tab, but a `q` press exits the app with tabs still open and
+        # leaves their `_tui_{PluginName}` entries in sys.modules until
+        # process exit. On a disable→re-enable cycle (fresh DashboardApp
+        # instance) the cached entry would be picked up by the
+        # sys.modules.get() short-circuit in _load_tui_widget_from_module_info,
+        # silently reusing stale code if the plugin's TUI was edited on
+        # disk between cycles.
+        for plugin_name in list(self._plugin_tab_map.values()):
+            try:
+                self._cleanup_tui_module(plugin_name)
+            except Exception:
+                pass
+        self._plugin_tab_map.clear()
         # Phase 2b — explicitly unregister the app-side bus observers
         # registered in `on_mount`. Plexus's `_unobserve_plugin`
         # auto-cleans on plugin pop, but app exit (e.g. user presses

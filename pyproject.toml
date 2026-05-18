@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plexus-tui"
-version = "0.40.0"
+version = "2.14.0"
 description = "Terminal UI dashboard plugin for the Plexus plugin framework."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,9 +35,18 @@ classifiers = [
     "Topic :: Terminals",
 ]
 dependencies = [
+    # plexus-core is not yet on PyPI. Until publication, install it
+    # from source (sibling Plexus framework repo) BEFORE running
+    # `pip install -e .` on this plugin. The version floor is the API
+    # this plugin was developed against.
     "plexus-core>=0.39.0",
     "textual>=8.2.3,<9",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Haflix/PlexusTUI"
+Source = "https://github.com/Haflix/PlexusTUI"
+Issues = "https://github.com/Haflix/PlexusTUI/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

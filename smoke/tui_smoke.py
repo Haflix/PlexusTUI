@@ -42,8 +42,17 @@ CONFIG = str(_HERE / "tui_smoke_config.yml")
 
 async def main():
     pc = Plexus(CONFIG)
-    await pc.wait_until_ready()
+
+    # `_shutdown_event` must exist BEFORE wait_until_ready so the TUI
+    # plugin's _run_tui_thread can pick it up via hasattr at TUI thread
+    # start. Without this ordering, a fast-exit TUI (immediate `q`,
+    # startup crash) can return from app.run() before main() reaches
+    # the assignment below — the thread's shutdown signal is dropped
+    # and the process hangs on pc._shutdown_event.wait() until Ctrl+C.
+    # Matches tui_smoke_node.py's ordering.
     pc._shutdown_event = asyncio.Event()
+
+    await pc.wait_until_ready()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

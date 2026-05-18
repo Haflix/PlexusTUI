@@ -103,11 +103,21 @@ class TUILogHandler(logging.Handler):
             self._needs_rebuild = True
 
     def detach(self):
-        """Detach from the widget, re-enable buffering."""
+        """Detach from the widget, re-enable buffering.
+
+        Clears displayed-row bookkeeping too — on a disable→re-enable
+        cycle the new DataTable is empty, and stale `_displayed_seqs`
+        from the previous session would cause `_incremental_update` to
+        issue remove_row calls for sequences that don't exist in the
+        fresh table. Reset `_needs_rebuild` so the next attach starts
+        from a full rebuild rather than a confused incremental.
+        """
         with self._lock:
             self._widget = None
             self._detail_widget = None
             self._app = None
+            self._displayed_seqs.clear()
+            self._needs_rebuild = True
 
     @property
     def display_level(self) -> int:
@@ -225,9 +235,21 @@ class TUILogHandler(logging.Handler):
         Returns (filtered_count, total_count) for status display, or None if
         no update was performed.
         """
-        if not self._dirty or self._paused:
+        # `_dirty` and `_needs_rebuild` are written by emit() on whichever
+        # thread the logging call ran on. Snapshot + clear them under the
+        # same lock that emit() uses so a concurrent emit() between the
+        # check and the clear can't have its flag silently dropped. The
+        # rendering work below doesn't need the lock — the DataTable is
+        # only touched from this (TUI) thread, and get_filtered_records
+        # re-acquires the lock for its own snapshot.
+        if self._paused:
             return None
-        self._dirty = False
+        with self._lock:
+            if not self._dirty:
+                return None
+            self._dirty = False
+            needs_rebuild = self._needs_rebuild
+            self._needs_rebuild = False
 
         widget = self._widget
         if widget is None:
@@ -241,9 +263,8 @@ class TUILogHandler(logging.Handler):
         new_seqs = [rec.seq for rec in display_slice]
 
         try:
-            if self._needs_rebuild:
+            if needs_rebuild:
                 # Full rebuild — filter or level changed
-                self._needs_rebuild = False
                 self._full_rebuild(widget, display_slice, new_seqs)
             else:
                 # Incremental — only append/remove as needed

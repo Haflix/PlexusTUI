@@ -1,0 +1,22 @@
+description: Custom-tab demo — implements get_tui_module_info() so the Dashboard loads a full Textual widget from tui/. Counterpart to TUIDemoSpare (Option 2, declarative menu). See docs/CUSTOM_TABS.md for the contract.
+version: 0.1.0
+remote: false
+arguments:
+
+endpoints:
+  tick:
+    internal_name: tick
+    remote: false
+    accessible_by_other_plugins: true
+    description: Bump the counter and append (timestamp, source) to the tick log. Called from the widget's timer and button.
+    tags: ["demo"]
+    arguments:
+      - {name: source, type: str, description: Who triggered the tick (auto / manual), default: "manual"}
+
+  reset:
+    internal_name: reset
+    remote: false
+    accessible_by_other_plugins: true
+    description: Reset the counter to zero and clear the tick log.
+    tags: ["demo"]
+    arguments: []

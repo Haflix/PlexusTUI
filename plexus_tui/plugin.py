@@ -23,7 +23,7 @@ _plugin_dir = os.path.dirname(os.path.abspath(__file__))
 def _import_sibling(module_name: str):
     path = os.path.join(_plugin_dir, f"{module_name}.py")
     spec = importlib.util.spec_from_file_location(
-        f"tui_dashboard.{module_name}", path
+        f"plexus_tui.{module_name}", path
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

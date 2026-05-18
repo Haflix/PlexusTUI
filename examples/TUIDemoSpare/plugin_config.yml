@@ -1,5 +1,5 @@
-description: TUI smoke demo — minimal "spare" plugin loaded but disabled. Shows the DISABLED phase in the Plugins table; click Enable to flip it READY live (demonstrates the _core/plugin/state_changed bus subscription).
-version: 0.1.0
+description: TUI demo plugin — small "spare" loaded but disabled by default. Shows the DISABLED phase in the Plugins table; clicking Enable flips it READY live (demonstrates the _core/plugin/state_changed bus subscription). Also implements get_tui_menu() so its custom tab demonstrates Option 2 (declarative menu) from docs/CUSTOM_TABS.md.
+version: 0.2.0
 remote: false
 arguments:
 
@@ -8,6 +8,32 @@ endpoints:
     internal_name: hello
     remote: false
     accessible_by_other_plugins: true
-    description: Returns a greeting string
-    tags: ["demo", "spare"]
+    description: Returns a greeting string. Wired to the menu's "Say hello" action button.
+    tags: ["demo"]
     arguments: []
+
+  reset_counter:
+    internal_name: reset_counter
+    remote: false
+    accessible_by_other_plugins: true
+    description: Resets the on_enable counter back to zero. Wired to the menu's "Reset counter" action button.
+    tags: ["demo"]
+    arguments: []
+
+  echo:
+    internal_name: echo
+    remote: false
+    accessible_by_other_plugins: true
+    description: Echoes the typed text back and keeps the last 5 inputs in a log. Wired to the menu's "Echo" input section.
+    tags: ["demo"]
+    arguments:
+      - {name: input, type: str, description: Text to echo back, default: ""}
+
+  set_verbose:
+    internal_name: set_verbose
+    remote: false
+    accessible_by_other_plugins: true
+    description: Toggles the verbose flag. Wired to the menu's "Verbose logging" toggle.
+    tags: ["demo"]
+    arguments:
+      - {name: state, type: bool, description: New verbose state, default: false}
